@@ -1,7 +1,7 @@
 import os
 import sys
 import logging
-from flask import Flask, jsonify
+from flask import Flask, jsonify, render_template, request
 from binance.client import Client
 from binance.exceptions import BinanceAPIException
 import pandas as pd

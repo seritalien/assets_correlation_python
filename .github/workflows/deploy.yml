@@ -3,7 +3,7 @@ name: Deploy to Vercel
 on:
   push:
     branches:
-      - main # Adjust this to your branch name
+      - main
 
 jobs:
   deploy:
@@ -16,7 +16,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v2
         with:
-          python-version: "3.9" # Ensure you are using a compatible version
+          python-version: "3.9"
 
       - name: Install build dependencies
         run: |
