@@ -1,22 +1,30 @@
 import os
-from flask import Flask, render_template, request, jsonify
+import sys
+import logging
+from flask import Flask, jsonify
 from binance.client import Client
 from binance.exceptions import BinanceAPIException
 import pandas as pd
 import plotly.graph_objects as go
-import logging
 from apscheduler.schedulers.background import BackgroundScheduler
 
+# Configure logging
 logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
-logging.debug(f"Python version: {sys.version}")
-logging.debug(f"Installed packages: {sys.modules.keys()}")
+logger = logging.getLogger()
 
-# Clés API Binance (remplacez par vos propres clés)
-api_key = 'tIR5sYunexlt3CoXygLlAhVIDJ80nPq8lRe32Bvxr8o70112NoI6RGS9AF9ORHus' #os.getenv('API_KEY')
-api_secret = 'K6s6DuK6NTd2vQ9by9uqaqjgfIkrhflc98GlZuYHicLcArNDZRTcQkhVDjN4ZqSS' #os.getenv('API_SECRET')
+# Load environment variables from .env file if present
+from dotenv import load_dotenv
+load_dotenv()
+
+# Get API key and secret from environment variables
+api_key = os.getenv('API_KEY')
+api_secret = os.getenv('API_SECRET')
 
 if not api_key or not api_secret:
     raise ValueError("API_KEY and API_SECRET environment variables are required")
+
+logger.debug(f"API_KEY: {api_key[:4]}...")  # Mask part of the key for security
+logger.debug(f"API_SECRET: {api_secret[:4]}...")  # Mask part of the secret for security
 
 client = Client(api_key, api_secret)
 
@@ -102,58 +110,74 @@ scheduler.start()
 
 @app.route('/')
 def index():
-    default_symbol = assets[0] if assets else 'BTCUSDT'
-    interval = '1d'
-    limit = 500
-    chart_type = 'candlestick'
-    if '/' in default_symbol:
-        asset1, asset2 = default_symbol.split('/')
-        data1 = get_historical_data(asset1, interval, limit)
-        data2 = get_historical_data(asset2, interval, limit)
-        plot_html = plot_ratio(data1, data2, asset1, asset2)
-    else:
-        data = get_historical_data(default_symbol, interval, limit)
-        plot_html = plot_candlestick(data, default_symbol)
-    return render_template('index.html', assets=assets, plot_html=plot_html, default_symbol=default_symbol, default_interval=interval, default_limit=limit, default_chart_type=chart_type)
+    try:
+        default_symbol = assets[0] if assets else 'BTCUSDT'
+        interval = '1d'
+        limit = 500
+        chart_type = 'candlestick'
+        if '/' in default_symbol:
+            asset1, asset2 = default_symbol.split('/')
+            data1 = get_historical_data(asset1, interval, limit)
+            data2 = get_historical_data(asset2, interval, limit)
+            plot_html = plot_ratio(data1, data2, asset1, asset2)
+        else:
+            data = get_historical_data(default_symbol, interval, limit)
+            plot_html = plot_candlestick(data, default_symbol)
+        return render_template('index.html', assets=assets, plot_html=plot_html, default_symbol=default_symbol, default_interval=interval, default_limit=limit, default_chart_type=chart_type)
+    except Exception as e:
+        logger.error(f"Error in index route: {e}")
+        return "An error occurred", 500
 
 @app.route('/plot', methods=['POST'])
 def plot():
-    symbol = request.form['symbol']
-    interval = request.form['interval']
-    limit = int(request.form.get('limit', 500))
-    chart_type = request.form.get('chart_type', 'candlestick')
-    if '/' in symbol:
-        asset1, asset2 = symbol.split('/')
-        data1 = get_historical_data(asset1, interval, limit)
-        data2 = get_historical_data(asset2, interval, limit)
-        plot_html = plot_ratio(data1, data2, asset1, asset2)
-    else:
-        data = get_historical_data(symbol, interval, limit)
-        if chart_type == 'line':
-            plot_html = plot_line(data, symbol)
+    try:
+        symbol = request.form['symbol']
+        interval = request.form['interval']
+        limit = int(request.form.get('limit', 500))
+        chart_type = request.form.get('chart_type', 'candlestick')
+        if '/' in symbol:
+            asset1, asset2 = symbol.split('/')
+            data1 = get_historical_data(asset1, interval, limit)
+            data2 = get_historical_data(asset2, interval, limit)
+            plot_html = plot_ratio(data1, data2, asset1, asset2)
         else:
-            plot_html = plot_candlestick(data, symbol)
-    return jsonify(plot_html=plot_html)
+            data = get_historical_data(symbol, interval, limit)
+            if chart_type == 'line':
+                plot_html = plot_line(data, symbol)
+            else:
+                plot_html = plot_candlestick(data, symbol)
+        return jsonify(plot_html=plot_html)
+    except Exception as e:
+        logger.error(f"Error in plot route: {e}")
+        return jsonify(error=str(e)), 500
 
 @app.route('/plot_ratio', methods=['POST'])
 def plot_ratio_route():
-    symbol1 = request.form['symbol1']
-    symbol2 = request.form['symbol2']
-    interval = request.form['interval']
-    limit = int(request.form.get('limit', 500))
-    data1 = get_historical_data(symbol1, interval, limit)
-    data2 = get_historical_data(symbol2, interval, limit)
-    comparison_asset = f"{symbol1}/{symbol2}"
-    plot_html = plot_ratio(data1, data2, symbol1, symbol2)
-    if comparison_asset not in assets:
-        assets.append(comparison_asset)
-        save_assets()
-    return jsonify(plot_html=plot_html, comparison_asset=comparison_asset)
+    try:
+        symbol1 = request.form['symbol1']
+        symbol2 = request.form['symbol2']
+        interval = request.form['interval']
+        limit = int(request.form.get('limit', 500))
+        data1 = get_historical_data(symbol1, interval, limit)
+        data2 = get_historical_data(symbol2, interval, limit)
+        comparison_asset = f"{symbol1}/{symbol2}"
+        plot_html = plot_ratio(data1, data2, symbol1, symbol2)
+        if comparison_asset not in assets:
+            assets.append(comparison_asset)
+            save_assets()
+        return jsonify(plot_html=plot_html, comparison_asset=comparison_asset)
+    except Exception as e:
+        logger.error(f"Error in plot_ratio route: {e}")
+        return jsonify(error=str(e)), 500
 
 @app.route('/refresh', methods=['POST'])
 def refresh():
-    update_data()
-    return jsonify(success=True)
+    try:
+        update_data()
+        return jsonify(success=True)
+    except Exception as e:
+        logger.error(f"Error in refresh route: {e}")
+        return jsonify(error=str(e)), 500
 
 @app.route('/add_asset', methods=['POST'])
 def add_asset():
@@ -166,16 +190,24 @@ def add_asset():
             update_data()
         return jsonify(success=True)
     except BinanceAPIException as e:
+        logger.error(f"BinanceAPIException in add_asset route: {e}")
+        return jsonify(success=False, error=str(e))
+    except Exception as e:
+        logger.error(f"Error in add_asset route: {e}")
         return jsonify(success=False, error=str(e))
 
 @app.route('/remove_asset', methods=['POST'])
 def remove_asset():
     asset = request.form['asset']
-    if asset in assets:
-        assets.remove(asset)
-        save_assets()
-        update_data()
-    return jsonify(success=True)
+    try:
+        if asset in assets:
+            assets.remove(asset)
+            save_assets()
+            update_data()
+        return jsonify(success=True)
+    except Exception as e:
+        logger.error(f"Error in remove_asset route: {e}")
+        return jsonify(success=False, error=str(e))
 
 if __name__ == '__main__':
     load_assets()
