@@ -7,8 +7,8 @@ import plotly.graph_objects as go
 from apscheduler.schedulers.background import BackgroundScheduler
 
 # Clés API Binance (remplacez par vos propres clés)
-api_key = os.getenv('API_KEY')
-api_secret = os.getenv('API_SECRET')
+api_key = 'tIR5sYunexlt3CoXygLlAhVIDJ80nPq8lRe32Bvxr8o70112NoI6RGS9AF9ORHus' #os.getenv('API_KEY')
+api_secret = 'K6s6DuK6NTd2vQ9by9uqaqjgfIkrhflc98GlZuYHicLcArNDZRTcQkhVDjN4ZqSS' #os.getenv('API_SECRET')
 
 if not api_key or not api_secret:
     raise ValueError("API_KEY and API_SECRET environment variables are required")
