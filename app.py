@@ -110,6 +110,7 @@ scheduler.start()
 
 @app.route('/')
 def index():
+    load_assets()
     try:
         default_symbol = assets[0] if assets else 'BTCUSDT'
         interval = '1d'

@@ -1,324 +1,122 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TradingView App</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://unpkg.com/feather-icons"></script>
-    <style>
-        body {
-            display: flex;
-            height: 100vh;
-            margin: 0;
-            font-family: 'Helvetica Neue', sans-serif;
-            color: #333;
-        }
-        #sidebar {
-            width: 250px;
-            padding: 20px;
-            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
-            background: #f9f9f9;
-        }
-        #content {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            padding: 20px;
-            background: #fff;
-        }
-        #plot-container {
-            flex-grow: 1;
-            width: 100%;
-            background: #f4f4f4;
-            border-radius: 8px;
-            padding: 10px;
-        }
-        .btn-small {
-            padding: 4px 8px;
-            font-size: 0.875rem;
-        }
-        .btn-selected {
-            background-color: #007bff;
-            color: white;
-        }
-        .confirm-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10;
-            visibility: hidden;
-        }
-        .confirm-overlay.active {
-            visibility: visible;
-        }
-        .confirm-dialog {
-            background: white;
-            padding: 20px;
-            border-radius: 5px;
-            text-align: center;
-        }
-        .error-message {
-            color: red;
-            margin-top: 10px;
-        }
-    </style>
+    <title>Asset Correlation</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
 <body class="bg-gray-100">
-    <div id="sidebar" class="bg-white">
-        <h2 class="text-2xl font-bold mb-4">Assets</h2>
-        <ul id="asset-list">
+
+<div class="flex">
+    <!-- Sidebar -->
+    <div class="w-1/4 bg-white p-6">
+        <h2 class="text-2xl font-bold mb-6">Assets</h2>
+        <ul id="asset-list" class="mb-6">
             {% for asset in assets %}
-                <li class="flex items-center justify-between mb-2">
-                    <button class="asset-button w-full text-left py-1 px-2 bg-gray-200 rounded hover:bg-gray-300" data-symbol="{{ asset }}">{{ asset }}</button>
-                    <button class="remove-asset-btn text-red-500" data-symbol="{{ asset }}">
-                        <i data-feather="trash-2"></i>
-                    </button>
-                </li>
+            <li class="flex items-center justify-between mb-2">
+                <button class="text-blue-500 hover:underline" onclick="selectAsset('{{ asset }}')">{{ asset }}</button>
+                <button class="text-red-500 hover:underline ml-2" onclick="removeAsset('{{ asset }}')">Remove</button>
+            </li>
             {% endfor %}
         </ul>
-        <form id="add-asset-form" class="mb-4">
-            <input type="text" id="new-asset" name="asset" placeholder="New asset" class="w-full px-4 py-2 mb-2 border rounded">
-            <button type="submit" class="w-full py-2 px-4 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center justify-center">
-                <i data-feather="plus" class="mr-2"></i> Add Asset
-            </button>
+        <form id="add-asset-form" class="mb-6">
+            <input type="text" id="new-asset" placeholder="New Asset" class="p-2 border border-gray-300 rounded mb-2 w-full">
+            <button type="button" onclick="addAsset()" class="bg-blue-500 text-white p-2 rounded w-full">Add Asset</button>
         </form>
-        <div id="add-asset-error" class="error-message hidden"></div>
-        <h2 class="text-2xl font-bold mt-8 mb-4">Settings</h2>
-        <form id="settings-form" class="space-y-4">
-            <div>
-                <label for="interval" class="block text-sm font-medium text-gray-700">Select Interval:</label>
-                <div class="grid grid-cols-3 gap-1 mt-2">
-                    {% for interval in ['1m', '2m', '3m', '4m', '5m', '15m', '1h', '4h', '1d', '1w', '1M'] %}
-                        <button type="button" class="interval-button py-1 px-2 bg-gray-200 rounded btn-small" data-interval="{{ interval }}">{{ interval }}</button>
-                    {% endfor %}
-                    <input type="text" id="custom-interval" name="interval" placeholder="Custom" class="col-span-3 py-1 px-2 border rounded btn-small">
-                </div>
-            </div>
-            <div>
-                <label for="limit" class="block text-sm font-medium text-gray-700">Number of Candles:</label>
-                <div class="grid grid-cols-3 gap-1 mt-2">
-                    {% for limit in [100, 1000, 500, 'max'] %}
-                        <button type="button" class="limit-button py-1 px-2 bg-gray-200 rounded btn-small" data-limit="{{ limit }}">{{ limit }}</button>
-                    {% endfor %}
-                    <input type="number" id="custom-limit" name="limit" placeholder="Custom" class="col-span-3 py-1 px-2 border rounded btn-small">
-                </div>
-            </div>
-            <div>
-                <label for="chart_type" class="block text-sm font-medium text-gray-700">Chart Type:</label>
-                <div class="flex space-x-1 mt-2">
-                    <button type="button" class="chart-type-button py-1 px-2 bg-gray-200 rounded btn-small" data-chart-type="candlestick">Candlestick</button>
-                    <button type="button" class="chart-type-button py-1 px-2 bg-gray-200 rounded btn-small" data-chart-type="line">Line</button>
-                </div>
-            </div>
+        <h2 class="text-2xl font-bold mb-6">Filters</h2>
+        <form id="filters-form">
+            <label for="timeframe" class="block mb-2">Timeframe</label>
+            <select id="timeframe" class="p-2 border border-gray-300 rounded mb-2 w-full">
+                <option value="1m">1 Minute</option>
+                <option value="5m">5 Minutes</option>
+                <option value="15m">15 Minutes</option>
+                <option value="1h">1 Hour</option>
+                <option value="4h">4 Hours</option>
+                <option value="1d" selected>1 Day</option>
+                <option value="1w">1 Week</option>
+                <option value="1M">1 Month</option>
+            </select>
+            <label for="limit" class="block mb-2">Candle Limit</label>
+            <input type="number" id="limit" value="500" class="p-2 border border-gray-300 rounded mb-2 w-full">
+            <label for="chart-type" class="block mb-2">Chart Type</label>
+            <select id="chart-type" class="p-2 border border-gray-300 rounded mb-2 w-full">
+                <option value="candlestick" selected>Candlestick</option>
+                <option value="line">Line</option>
+            </select>
         </form>
-        <div class="mt-8">
-            <h2 class="text-2xl font-bold mb-4">Compare Assets</h2>
-            <div class="space-y-4">
-                <div>
-                    <label for="symbol1" class="block text-sm font-medium text-gray-700">Asset 1:</label>
-                    <select id="symbol1" name="symbol1" class="w-full px-2 py-1 border rounded btn-small">
-                        {% for asset in assets %}
-                            <option value="{{ asset }}">{{ asset }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div>
-                    <label for="symbol2" class="block text-sm font-medium text-gray-700">Asset 2:</label>
-                    <select id="symbol2" name="symbol2" class="w-full px-2 py-1 border rounded btn-small">
-                        {% for asset in assets %}
-                            <option value="{{ asset }}">{{ asset }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <button id="compare-button" class="w-full py-2 px-4 bg-green-500 text-white rounded hover:bg-green-600 flex items-center justify-center">
-                    Compare
-                </button>
-            </div>
-        </div>
-        <button id="refresh-button" class="mt-8 w-full py-2 px-4 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center justify-center">
-            <i data-feather="refresh-cw" class="mr-2"></i> Refresh Data
-        </button>
+        <button type="button" onclick="refreshData()" class="bg-green-500 text-white p-2 rounded w-full">Refresh</button>
     </div>
-    <div id="content">
-        <div id="plot-container">{{ plot_html|safe }}</div>
-    </div>
-    <div id="confirm-remove" class="confirm-overlay">
-        <div class="confirm-dialog">
-            <p>Are you sure you want to remove this asset?</p>
-            <button id="confirm-remove-yes" class="py-2 px-4 bg-red-500 text-white rounded">Yes</button>
-            <button id="confirm-remove-no" class="py-2 px-4 bg-gray-500 text-white rounded">No</button>
+
+    <!-- Main Content -->
+    <div class="w-3/4 p-6">
+        <div id="chart" class="bg-white p-6 rounded shadow-md">
+            {{ plot_html|safe }}
         </div>
     </div>
-    <script>
-        $(document).ready(function() {
-            let assetToRemove = null;
+</div>
 
-            function updatePlot() {
-                const symbol = $('.asset-button.active').data('symbol');
-                $.ajax({
-                    url: '/plot',
-                    method: 'POST',
-                    data: {
-                        symbol: symbol,
-                        interval: $('.interval-button.active').data('interval') || $('#custom-interval').val(),
-                        limit: $('.limit-button.active').data('limit') || $('#custom-limit').val(),
-                        chart_type: $('.chart-type-button.active').data('chart-type')
-                    },
-                    success: function(response) {
-                        $('#plot-container').html(response.plot_html);
-                    }
-                });
+<script>
+    function selectAsset(asset) {
+        document.querySelector('#filters-form').setAttribute('data-asset', asset);
+        refreshData();
+    }
+
+    function addAsset() {
+        const asset = document.querySelector('#new-asset').value;
+        fetch('/add_asset', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ asset })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert(data.error);
             }
-
-            function updateRatioPlot() {
-                const symbol1 = $('#symbol1').val();
-                const symbol2 = $('#symbol2').val();
-                const interval = $('.interval-button.active').data('interval') || $('#custom-interval').val();
-                const limit = $('.limit-button.active').data('limit') || $('#custom-limit').val();
-                $.ajax({
-                    url: '/plot_ratio',
-                    method: 'POST',
-                    data: {
-                        symbol1: symbol1,
-                        symbol2: symbol2,
-                        interval: interval,
-                        limit: limit
-                    },
-                    success: function(response) {
-                        $('#plot-container').html(response.plot_html);
-                        if (!$('.asset-button[data-symbol="' + response.comparison_asset + '"]').length) {
-                            $('<li class="flex items-center justify-between mb-2">')
-                                .append($('<button class="asset-button w-full text-left py-1 px-2 bg-gray-200 rounded hover:bg-gray-300">')
-                                    .data('symbol', response.comparison_asset)
-                                    .text(response.comparison_asset)
-                                    .addClass('active btn-selected'))
-                                .append($('<button class="remove-asset-btn text-red-500">')
-                                    .data('symbol', response.comparison_asset)
-                                    .html('<i data-feather="trash-2"></i>'))
-                                .appendTo('#asset-list');
-                            feather.replace();
-                        } else {
-                            $('.asset-button[data-symbol="' + response.comparison_asset + '"]').addClass('active btn-selected');
-                        }
-                    }
-                });
-            }
-
-            $(document).on('click', '.asset-button', function() {
-                $('.asset-button').removeClass('active btn-selected');
-                $(this).addClass('active btn-selected');
-                updatePlot();
-            });
-
-            $('.interval-button').on('click', function() {
-                $('.interval-button').removeClass('active btn-selected');
-                $(this).addClass('active btn-selected');
-                $('#custom-interval').val('');
-                updatePlot();
-            });
-
-            $('.limit-button').on('click', function() {
-                $('.limit-button').removeClass('active btn-selected');
-                $(this).addClass('active btn-selected');
-                $('#custom-limit').val('');
-                updatePlot();
-            });
-
-            $('.chart-type-button').on('click', function() {
-                $('.chart-type-button').removeClass('active btn-selected');
-                $(this).addClass('active btn-selected');
-                updatePlot();
-            });
-
-            $('#custom-interval').on('change', function() {
-                $('.interval-button').removeClass('active btn-selected');
-                updatePlot();
-            });
-
-            $('#custom-limit').on('change', function() {
-                $('.limit-button').removeClass('active btn-selected');
-                updatePlot();
-            });
-
-            $('#refresh-button').on('click', function() {
-                $.ajax({
-                    url: '/refresh',
-                    method: 'POST',
-                    success: function(response) {
-                        if (response.success) {
-                            updatePlot();
-                        }
-                    }
-                });
-            });
-
-            $('#add-asset-form').on('submit', function(event) {
-                event.preventDefault();
-                $('#add-asset-error').addClass('hidden');
-                $.ajax({
-                    url: '/add_asset',
-                    method: 'POST',
-                    data: { asset: $('#new-asset').val() },
-                    success: function(response) {
-                        if (response.success) {
-                            location.reload();
-                        } else {
-                            $('#add-asset-error').text(response.error).removeClass('hidden');
-                        }
-                    }
-                });
-            });
-
-            $(document).on('click', '.remove-asset-btn', function() {
-                assetToRemove = $(this).data('symbol');
-                $('#confirm-remove').addClass('active');
-            });
-
-            $('#confirm-remove-yes').on('click', function() {
-                $.ajax({
-                    url: '/remove_asset',
-                    method: 'POST',
-                    data: { asset: assetToRemove },
-                    success: function(response) {
-                        if (response.success) {
-                            location.reload();
-                        }
-                    }
-                });
-                $('#confirm-remove').removeClass('active');
-            });
-
-            $('#confirm-remove-no').on('click', function() {
-                $('#confirm-remove').removeClass('active');
-                assetToRemove = null;
-            });
-
-            $('#compare-button').on('click', function() {
-                updateRatioPlot();
-            });
-
-            // Set the first asset as active by default
-            $('.asset-button').first().addClass('active btn-selected');
-
-            // Initialize Feather Icons
-            feather.replace();
-
-            // Auto-update plot every 5 minutes
-            setInterval(updatePlot, 300000); // 300000 ms = 5 minutes
-
-            // Adjust plot size on window resize
-            $(window).resize(function() {
-                updatePlot();
-            });
         });
-    </script>
+    }
+
+    function removeAsset(asset) {
+        fetch('/remove_asset', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ asset })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert(data.error);
+            }
+        });
+    }
+
+    function refreshData() {
+        const asset = document.querySelector('#filters-form').getAttribute('data-asset') || '{{ default_symbol }}';
+        const interval = document.querySelector('#timeframe').value;
+        const limit = document.querySelector('#limit').value;
+        const chartType = document.querySelector('#chart-type').value;
+
+        fetch('/plot', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ symbol: asset, interval, limit, chart_type: chartType })
+        })
+        .then(response => response.json())
+        .then(data => {
+            document.querySelector('#chart').innerHTML = data.plot_html;
+        });
+    }
+</script>
+
 </body>
 </html>
