@@ -1,0 +1,42 @@
+{
+    "name": "Ceri General Dev Container",
+    "image": "seritalien/devcontainer.alpine:0.3", // Remplacez par le nom de votre image
+    "forwardPorts": [
+        3000
+    ], // Les ports que vous souhaitez transmettre
+    "postCreateCommand": "sudo pip install python-binance flask apscheduler pandas plotly && echo 'That is all Folks [@devsuser] !'", // Commande à exécuter après la création du conteneur
+    "runArgs": [ // Arguments à passer à Docker
+        "--network=host", // Utilisez le réseau hôte de Docker
+        "-v",
+        "${localWorkspaceFolder}/:/workspace" // Montez votre dossier de travail local dans /workspace dans le conteneur
+    ],
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "dbaeumer.vscode-eslint", // Pour le linting JavaScript/React
+                "esbenp.prettier-vscode", // Pour le formatage du code
+                "ms-azuretools.vscode-docker", // Pour travailler avec Docker
+                "eamodio.gitlens", // Pour améliorer l'expérience Git
+                "ms-python.python", // Pour le développement Python
+                "ms-toolsai.jupyter", // Pour les notebooks Jupyter
+                "ms-vscode.node-debug2", // Pour le débogage Node.js
+                "msjsdiag.vscode-react-native", // Pour le développement React Native
+                "StarkWare.cairo1",
+                "tamasfe.even-better-toml"
+            ],
+            "settings": {
+                "terminal.integrated.shell.linux": "/bin/bash",
+                "python.pythonPath": "/usr/local/bin/python3", // Chemin vers l'interpréteur Python
+                "python.linting.enabled": true, // Active le linting Python
+                "python.linting.pylintEnabled": true, // Utilise pylint pour le linting Python
+                "editor.formatOnSave": true, // Formate le code à l'enregistrement
+                "files.autoSave": "onFocusChange", // Enregistre automatiquement les fichiers lors du changement de focus
+                "terminal.integrated.profiles.linux": {
+                    "zsh": {
+                        "path": "/bin/zsh"
+                    }
+                }
+            }
+        }
+    }
+}

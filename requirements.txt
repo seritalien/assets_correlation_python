@@ -1,0 +1,5 @@
+Flask
+binance
+pandas
+plotly
+APScheduler
