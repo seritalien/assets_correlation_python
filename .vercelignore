@@ -1,0 +1,11 @@
+# .vercelignore
+*.md
+*.txt
+*.log
+*.csv
+*.json
+__pycache__
+*.pyc
+tests/
+docs/
+node_modules/
