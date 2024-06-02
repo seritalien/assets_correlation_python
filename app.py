@@ -1,4 +1,5 @@
 from binance.client import Client
+from binance.exceptions import BinanceAPIException
 import pandas as pd
 import plotly.graph_objects as go
 from flask import Flask, render_template, request, jsonify
@@ -16,6 +17,7 @@ app = Flask(__name__)
 # Variables globales
 assets = []
 data_cache = {}
+comparison_asset = None
 
 # Charger la liste des assets
 def load_assets():
@@ -77,7 +79,13 @@ def plot_ratio(data1, data2, symbol1, symbol2):
 def update_data():
     global data_cache
     for asset in assets:
-        data_cache[asset] = get_historical_data(asset, '1h', 5000)
+        if '/' not in asset:
+            data_cache[asset] = get_historical_data(asset, '1d', 500)
+        else:
+            asset1, asset2 = asset.split('/')
+            data1 = get_historical_data(asset1, '1d', 500)
+            data2 = get_historical_data(asset2, '1d', 500)
+            data_cache[asset] = data1, data2
 
 scheduler = BackgroundScheduler()
 scheduler.add_job(func=update_data, trigger="interval", minutes=5)
@@ -86,24 +94,36 @@ scheduler.start()
 @app.route('/')
 def index():
     default_symbol = assets[0] if assets else 'BTCUSDT'
-    interval = '1h'
-    limit = 5000
+    interval = '1d'
+    limit = 500
     chart_type = 'candlestick'
-    data = get_historical_data(default_symbol, interval, limit)
-    plot_html = plot_candlestick(data, default_symbol)
+    if '/' in default_symbol:
+        asset1, asset2 = default_symbol.split('/')
+        data1 = get_historical_data(asset1, interval, limit)
+        data2 = get_historical_data(asset2, interval, limit)
+        plot_html = plot_ratio(data1, data2, asset1, asset2)
+    else:
+        data = get_historical_data(default_symbol, interval, limit)
+        plot_html = plot_candlestick(data, default_symbol)
     return render_template('index.html', assets=assets, plot_html=plot_html, default_symbol=default_symbol, default_interval=interval, default_limit=limit, default_chart_type=chart_type)
 
 @app.route('/plot', methods=['POST'])
 def plot():
     symbol = request.form['symbol']
     interval = request.form['interval']
-    limit = int(request.form.get('limit', 5000))
+    limit = int(request.form.get('limit', 500))
     chart_type = request.form.get('chart_type', 'candlestick')
-    data = get_historical_data(symbol, interval, limit)
-    if chart_type == 'line':
-        plot_html = plot_line(data, symbol)
+    if '/' in symbol:
+        asset1, asset2 = symbol.split('/')
+        data1 = get_historical_data(asset1, interval, limit)
+        data2 = get_historical_data(asset2, interval, limit)
+        plot_html = plot_ratio(data1, data2, asset1, asset2)
     else:
-        plot_html = plot_candlestick(data, symbol)
+        data = get_historical_data(symbol, interval, limit)
+        if chart_type == 'line':
+            plot_html = plot_line(data, symbol)
+        else:
+            plot_html = plot_candlestick(data, symbol)
     return jsonify(plot_html=plot_html)
 
 @app.route('/plot_ratio', methods=['POST'])
@@ -111,11 +131,15 @@ def plot_ratio_route():
     symbol1 = request.form['symbol1']
     symbol2 = request.form['symbol2']
     interval = request.form['interval']
-    limit = int(request.form.get('limit', 5000))
+    limit = int(request.form.get('limit', 500))
     data1 = get_historical_data(symbol1, interval, limit)
     data2 = get_historical_data(symbol2, interval, limit)
+    comparison_asset = f"{symbol1}/{symbol2}"
     plot_html = plot_ratio(data1, data2, symbol1, symbol2)
-    return jsonify(plot_html=plot_html)
+    if comparison_asset not in assets:
+        assets.append(comparison_asset)
+        save_assets()
+    return jsonify(plot_html=plot_html, comparison_asset=comparison_asset)
 
 @app.route('/refresh', methods=['POST'])
 def refresh():
@@ -125,11 +149,15 @@ def refresh():
 @app.route('/add_asset', methods=['POST'])
 def add_asset():
     asset = request.form['asset']
-    if asset not in assets:
-        assets.append(asset)
-        save_assets()
-        update_data()
-    return jsonify(success=True)
+    try:
+        get_historical_data(asset, '1d', 1)  # Test if the asset exists by fetching a single data point
+        if asset not in assets:
+            assets.append(asset)
+            save_assets()
+            update_data()
+        return jsonify(success=True)
+    except BinanceAPIException as e:
+        return jsonify(success=False, error=str(e))
 
 @app.route('/remove_asset', methods=['POST'])
 def remove_asset():

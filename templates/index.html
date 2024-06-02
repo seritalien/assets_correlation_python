@@ -12,25 +12,36 @@
             display: flex;
             height: 100vh;
             margin: 0;
+            font-family: 'Helvetica Neue', sans-serif;
+            color: #333;
         }
         #sidebar {
             width: 250px;
             padding: 20px;
             box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+            background: #f9f9f9;
         }
         #content {
             flex-grow: 1;
             display: flex;
             flex-direction: column;
             padding: 20px;
+            background: #fff;
         }
         #plot-container {
             flex-grow: 1;
             width: 100%;
+            background: #f4f4f4;
+            border-radius: 8px;
+            padding: 10px;
         }
         .btn-small {
             padding: 4px 8px;
             font-size: 0.875rem;
+        }
+        .btn-selected {
+            background-color: #007bff;
+            color: white;
         }
         .confirm-overlay {
             position: fixed;
@@ -43,6 +54,10 @@
             align-items: center;
             justify-content: center;
             z-index: 10;
+            visibility: hidden;
+        }
+        .confirm-overlay.active {
+            visibility: visible;
         }
         .confirm-dialog {
             background: white;
@@ -50,12 +65,16 @@
             border-radius: 5px;
             text-align: center;
         }
+        .error-message {
+            color: red;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body class="bg-gray-100">
     <div id="sidebar" class="bg-white">
         <h2 class="text-2xl font-bold mb-4">Assets</h2>
-        <ul>
+        <ul id="asset-list">
             {% for asset in assets %}
                 <li class="flex items-center justify-between mb-2">
                     <button class="asset-button w-full text-left py-1 px-2 bg-gray-200 rounded hover:bg-gray-300" data-symbol="{{ asset }}">{{ asset }}</button>
@@ -71,6 +90,7 @@
                 <i data-feather="plus" class="mr-2"></i> Add Asset
             </button>
         </form>
+        <div id="add-asset-error" class="error-message hidden"></div>
         <h2 class="text-2xl font-bold mt-8 mb-4">Settings</h2>
         <form id="settings-form" class="space-y-4">
             <div>
@@ -85,7 +105,7 @@
             <div>
                 <label for="limit" class="block text-sm font-medium text-gray-700">Number of Candles:</label>
                 <div class="grid grid-cols-3 gap-1 mt-2">
-                    {% for limit in [100, 1000, 5000, 'max'] %}
+                    {% for limit in [100, 1000, 500, 'max'] %}
                         <button type="button" class="limit-button py-1 px-2 bg-gray-200 rounded btn-small" data-limit="{{ limit }}">{{ limit }}</button>
                     {% endfor %}
                     <input type="number" id="custom-limit" name="limit" placeholder="Custom" class="col-span-3 py-1 px-2 border rounded btn-small">
@@ -130,7 +150,7 @@
     <div id="content">
         <div id="plot-container">{{ plot_html|safe }}</div>
     </div>
-    <div id="confirm-remove" class="confirm-overlay hidden">
+    <div id="confirm-remove" class="confirm-overlay">
         <div class="confirm-dialog">
             <p>Are you sure you want to remove this asset?</p>
             <button id="confirm-remove-yes" class="py-2 px-4 bg-red-500 text-white rounded">Yes</button>
@@ -142,11 +162,12 @@
             let assetToRemove = null;
 
             function updatePlot() {
+                const symbol = $('.asset-button.active').data('symbol');
                 $.ajax({
                     url: '/plot',
                     method: 'POST',
                     data: {
-                        symbol: $('.asset-button.active').data('symbol'),
+                        symbol: symbol,
                         interval: $('.interval-button.active').data('interval') || $('#custom-interval').val(),
                         limit: $('.limit-button.active').data('limit') || $('#custom-limit').val(),
                         chart_type: $('.chart-type-button.active').data('chart-type')
@@ -158,54 +179,72 @@
             }
 
             function updateRatioPlot() {
+                const symbol1 = $('#symbol1').val();
+                const symbol2 = $('#symbol2').val();
+                const interval = $('.interval-button.active').data('interval') || $('#custom-interval').val();
+                const limit = $('.limit-button.active').data('limit') || $('#custom-limit').val();
                 $.ajax({
                     url: '/plot_ratio',
                     method: 'POST',
                     data: {
-                        symbol1: $('#symbol1').val(),
-                        symbol2: $('#symbol2').val(),
-                        interval: $('.interval-button.active').data('interval') || $('#custom-interval').val(),
-                        limit: $('.limit-button.active').data('limit') || $('#custom-limit').val()
+                        symbol1: symbol1,
+                        symbol2: symbol2,
+                        interval: interval,
+                        limit: limit
                     },
                     success: function(response) {
                         $('#plot-container').html(response.plot_html);
+                        if (!$('.asset-button[data-symbol="' + response.comparison_asset + '"]').length) {
+                            $('<li class="flex items-center justify-between mb-2">')
+                                .append($('<button class="asset-button w-full text-left py-1 px-2 bg-gray-200 rounded hover:bg-gray-300">')
+                                    .data('symbol', response.comparison_asset)
+                                    .text(response.comparison_asset)
+                                    .addClass('active btn-selected'))
+                                .append($('<button class="remove-asset-btn text-red-500">')
+                                    .data('symbol', response.comparison_asset)
+                                    .html('<i data-feather="trash-2"></i>'))
+                                .appendTo('#asset-list');
+                            feather.replace();
+                        } else {
+                            $('.asset-button[data-symbol="' + response.comparison_asset + '"]').addClass('active btn-selected');
+                        }
                     }
                 });
             }
 
-            $('.asset-button').on('click', function() {
-                $('.asset-button').removeClass('active');
-                $(this).addClass('active');
+            $(document).on('click', '.asset-button', function() {
+                $('.asset-button').removeClass('active btn-selected');
+                $(this).addClass('active btn-selected');
                 updatePlot();
             });
 
             $('.interval-button').on('click', function() {
-                $('.interval-button').removeClass('active');
-                $(this).addClass('active');
+                $('.interval-button').removeClass('active btn-selected');
+                $(this).addClass('active btn-selected');
                 $('#custom-interval').val('');
                 updatePlot();
             });
 
             $('.limit-button').on('click', function() {
-                $('.limit-button').removeClass('active');
-                $(this).addClass('active');
+                $('.limit-button').removeClass('active btn-selected');
+                $(this).addClass('active btn-selected');
                 $('#custom-limit').val('');
                 updatePlot();
             });
 
             $('.chart-type-button').on('click', function() {
-                $('.chart-type-button').removeClass('active');
-                $(this).addClass('active');
+                $('.chart-type-button').removeClass('active btn-selected');
+                $(this).addClass('active btn-selected');
                 updatePlot();
             });
 
             $('#custom-interval').on('change', function() {
-                $('.interval-button').removeClass('active');
+                $('.interval-button').removeClass('active btn-selected');
                 updatePlot();
             });
 
             $('#custom-limit').on('change', function() {
-                $('.limit-button').removeClass('active');
+                $('.limit-button').removeClass('active btn-selected');
                 updatePlot();
             });
 
@@ -223,6 +262,7 @@
 
             $('#add-asset-form').on('submit', function(event) {
                 event.preventDefault();
+                $('#add-asset-error').addClass('hidden');
                 $.ajax({
                     url: '/add_asset',
                     method: 'POST',
@@ -230,28 +270,16 @@
                     success: function(response) {
                         if (response.success) {
                             location.reload();
+                        } else {
+                            $('#add-asset-error').text(response.error).removeClass('hidden');
                         }
                     }
                 });
             });
 
-            $('#remove-asset-form').on('submit', function(event) {
-                event.preventDefault();
-                $.ajax({
-                    url: '/remove_asset',
-                    method: 'POST',
-                    data: { asset: $('#remove-asset').val() },
-                    success: function(response) {
-                        if (response.success) {
-                            location.reload();
-                        }
-                    }
-                });
-            });
-
-            $('.remove-asset-btn').on('click', function() {
+            $(document).on('click', '.remove-asset-btn', function() {
                 assetToRemove = $(this).data('symbol');
-                $('#confirm-remove').removeClass('hidden');
+                $('#confirm-remove').addClass('active');
             });
 
             $('#confirm-remove-yes').on('click', function() {
@@ -265,10 +293,12 @@
                         }
                     }
                 });
+                $('#confirm-remove').removeClass('active');
             });
 
             $('#confirm-remove-no').on('click', function() {
-                $('#confirm-remove').addClass('hidden');
+                $('#confirm-remove').removeClass('active');
+                assetToRemove = null;
             });
 
             $('#compare-button').on('click', function() {
@@ -276,7 +306,7 @@
             });
 
             // Set the first asset as active by default
-            $('.asset-button').first().addClass('active');
+            $('.asset-button').first().addClass('active btn-selected');
 
             // Initialize Feather Icons
             feather.replace();
