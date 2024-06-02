@@ -1,14 +1,17 @@
+import os
+from flask import Flask, render_template, request, jsonify
 from binance.client import Client
 from binance.exceptions import BinanceAPIException
 import pandas as pd
 import plotly.graph_objects as go
-from flask import Flask, render_template, request, jsonify
 from apscheduler.schedulers.background import BackgroundScheduler
-import os
 
 # Clés API Binance (remplacez par vos propres clés)
-api_key = 'VOTRE_API_KEY'
-api_secret = 'VOTRE_API_SECRET'
+api_key = os.getenv('API_KEY')
+api_secret = os.getenv('API_SECRET')
+
+if not api_key or not api_secret:
+    raise ValueError("API_KEY and API_SECRET environment variables are required")
 
 client = Client(api_key, api_secret)
 
@@ -22,15 +25,16 @@ comparison_asset = None
 # Charger la liste des assets
 def load_assets():
     global assets
-    with open('assets.txt', 'r') as file:
-        assets = [line.strip() for line in file]
+    if os.path.exists('assets.txt'):
+        with open('assets.txt', 'r') as file:
+            assets = [line.strip() for line in file]
 
 def save_assets():
     with open('assets.txt', 'w') as file:
         for asset in assets:
             file.write(f"{asset}\n")
 
-def get_historical_data(symbol, interval, limit=5000):
+def get_historical_data(symbol, interval, limit=500):
     klines = client.get_klines(symbol=symbol, interval=interval, limit=limit)
     data = pd.DataFrame(klines, columns=[
         'timestamp', 'open', 'high', 'low', 'close', 'volume', 
