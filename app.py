@@ -4,7 +4,12 @@ from binance.client import Client
 from binance.exceptions import BinanceAPIException
 import pandas as pd
 import plotly.graph_objects as go
+import logging
 from apscheduler.schedulers.background import BackgroundScheduler
+
+logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
+logging.debug(f"Python version: {sys.version}")
+logging.debug(f"Installed packages: {sys.modules.keys()}")
 
 # Clés API Binance (remplacez par vos propres clés)
 api_key = 'tIR5sYunexlt3CoXygLlAhVIDJ80nPq8lRe32Bvxr8o70112NoI6RGS9AF9ORHus' #os.getenv('API_KEY')

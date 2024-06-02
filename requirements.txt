@@ -1,5 +1,6 @@
-Flask
-binance
-pandas
-plotly
-APScheduler
+Flask==2.0.1
+python-binance==1.0.16
+pandas==1.3.3
+plotly==5.3.1
+APScheduler==3.7.0
+python-dotenv==0.19.0
