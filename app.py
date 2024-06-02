@@ -7,13 +7,13 @@ from binance.exceptions import BinanceAPIException
 import pandas as pd
 import plotly.graph_objects as go
 from apscheduler.schedulers.background import BackgroundScheduler
+from dotenv import load_dotenv
 
 # Configure logging
 logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
 logger = logging.getLogger()
 
 # Load environment variables from .env file if present
-from dotenv import load_dotenv
 load_dotenv()
 
 # Get API key and secret from environment variables
